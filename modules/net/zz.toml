@@ -12,6 +12,7 @@ string = "1"
 err = "1"
 byteorder = "1"
 io = "1"
+pool = "1"
 
 [variants]
 default = []

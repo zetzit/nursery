@@ -1,0 +1,87 @@
+using address;
+using string;
+using err;
+using io;
+using net::{Engine};
+using tcp;
+
+inline using (needs
+    Server,
+    tcp::Socket,
+    err::Err,
+    err::fail_with_errno,
+    err::fail,
+    io::Context,
+    address::Type,
+    address::Address,
+    io::Result,
+    io::Ready,
+    io::select,
+) "os_tcp.h"::{
+    os_net_tcp_server_listen,
+    os_net_tcp_server_close,
+    os_net_tcp_server_make_async,
+    os_net_tcp_server_accept,
+    os_net_tcp_make_async,
+};
+
+export fntype accept_fn   (
+        Server  mut *self,
+        err::Err+et mut *e,
+        tcp::Socket mut *client,
+) -> io::Result;
+
+export struct Server {
+    io::Context     ctx;
+    io::close_fn    impl_close;
+    accept_fn       impl_accept;
+}
+
+pub fn os_new(Engine * engine, err::Err+et mut*e, address::Address *addr,  io::Async mut* unsafe async) -> Server
+    where err::checked(*e)
+{
+    Server mut sock = {0};
+    os_net_tcp_server_listen(e, et, addr, &sock);
+    if err::check(e) {
+        return sock;
+    }
+
+    if async == 0 {
+        return sock;
+    }
+    static_attest(safe(async));
+    os_net_tcp_server_make_async(e, et, &sock);
+    (sock.ctx).async = async;
+
+    return sock;
+}
+
+export fn accept(
+        Server  mut *self,
+        err::Err+et mut *e,
+        tcp::Socket mut*client,
+) -> io::Result
+    where err::checked(*e)
+{
+    accept_fn impl = self->impl_accept;
+    if impl == 0 {
+        err::fail(e, 2, "no recv impl");
+        return io::Result::Error;
+    }
+    static_attest(safe(impl));
+
+    io::Result rr = (io::Result)impl(self, e, client);
+    if err::check(e) {
+        return rr;
+    }
+    os_net_tcp_make_async(e, et, client);
+    return rr;
+}
+
+export fn close(Server mut*self) {
+    if self->impl_close == 0 {
+        return;
+    }
+    static_attest(safe(self->impl_close));
+    self->impl_close(&self->ctx);
+}

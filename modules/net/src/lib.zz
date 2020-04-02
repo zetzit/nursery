@@ -1,22 +1,37 @@
 using address;
-using udp;
+using udp           as udpI;
+using tcp_server    as tcp_serverI;
+using tcp           as tcpI;
 
 using err;
 using io;
 
-export fntype new_udp_fn(Engine *self, err::Err+et mut*e, address::Address *local_addr, io::Async mut* unsafe async)  -> udp::Socket;
+fntype new_udp_fn(
+    Engine *self,
+    err::Err+et mut*e,
+    address::Address *local_addr,
+    io::Async mut* unsafe async
+)  -> udpI::Socket;
+
+fntype new_tcp_server_fn(
+    Engine *self,
+    err::Err+et mut*e,
+    address::Address *local_addr,
+    io::Async mut* unsafe async
+)  -> tcp_serverI::Server;
 
 export struct Engine {
-    void *  handle1;
-    int     handle2;
-    int     handle3;
-    void*   impl_new_udp;
+    void *              handle1;
+    int                 handle2;
+    int                 handle3;
+    new_udp_fn          impl_new_udp;
+    new_tcp_server_fn   impl_new_tcp_server;
 }
 
 static Engine os_engine = Engine {
-    impl_new_udp:  (void*)udp::os_new,
+    impl_new_udp:           udpI::os_new,
+    impl_new_tcp_server:    tcp_serverI::os_new,
 };
-
 export fn os() -> Engine*
     model safe(return)
 {
@@ -24,7 +39,13 @@ export fn os() -> Engine*
 }
 
 
-export fn make_udp(udp::Socket mut new*self, Engine *engine, err::Err+et mut*e, address::Address *local_addr, io::Async mut* unsafe async)
+export fn udp(
+    udpI::Socket mut new* self,
+    Engine *engine,
+    err::Err+et mut*e,
+    address::Address *local_addr,
+    io::Async mut* unsafe async
+)
     where err::checked(*e)
 {
     new_udp_fn impl_new_udp = (new_udp_fn)engine->impl_new_udp;
@@ -34,4 +55,20 @@ export fn make_udp(udp::Socket mut new*self, Engine *engine, err::Err+et mut*e, 
     }
     static_attest(safe(impl_new_udp));
     *self = impl_new_udp(engine, e, local_addr, async);
+}
+
+export fn tcp_server(
+    tcp_serverI::Server mut new*self,
+    Engine *engine, err::Err+et mut*e,
+    address::Address *local_addr,
+    io::Async mut* unsafe async)
+    where err::checked(*e)
+{
+    new_tcp_server_fn impl_new_tcp_server = (new_tcp_server_fn)engine->impl_new_tcp_server;
+    if impl_new_tcp_server == 0 {
+        err::fail(e, 1, "no new_tcp_server impl");
+        return;
+    }
+    static_attest(safe(impl_new_tcp_server));
+    *self = impl_new_tcp_server(engine, e, local_addr, async);
 }

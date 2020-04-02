@@ -1,0 +1,97 @@
+using io;
+using err;
+using net;
+using tcp_server::{Server};
+using address;
+using string;
+
+inline using (needs
+    Server,
+    Socket,
+    err::Err,
+    err::fail_with_errno,
+    err::fail,
+    io::Context,
+    address::Type,
+    address::Address,
+    io::Result,
+    io::Ready,
+    io::select,
+) "os_tcp.h"::{
+    os_net_tcp_close,
+    os_net_tcp_send,
+    os_net_tcp_recv,
+};
+
+export fntype send_fn(
+        Socket mut*sock,
+        err::Err mut*e,
+        usize et,
+        u8* mem,
+        usize mut*memlen,
+) -> io::Result;
+
+export fntype recv_fn   (
+        Socket mut*sock,
+        err::Err mut *e,
+        usize et,
+        u8 mut * mem,
+        usize mut*memlen,
+) -> io::Result;
+
+export struct Socket {
+    io::Context     ctx;
+    io::close_fn    impl_close;
+
+    net::address::Address remote_addr;
+
+    send_fn impl_send;
+    recv_fn impl_recv;
+}
+
+
+export fn recv(Socket mut *self, err::Err+et mut*e, string::String+st mut *buf) -> io::Result
+    where err::checked(*e)
+{
+    recv_fn impl = self->impl_recv;
+    if impl == 0 {
+        err::fail(e, 2, "no recv impl");
+        return io::Result::Error;
+    }
+    static_attest(safe(impl));
+
+    static_attest(len(buf->mem) > buf->len);
+    usize mut memlen = st - buf->len;
+    io::Result rr = (io::Result)impl(self, e, et, as<u8 mut*>(buf->mem + buf->len), &memlen);
+    if err::check(e) {
+        return rr;
+    }
+    buf->len += memlen;
+    return rr;
+}
+
+export fn send(Socket mut *self, err::Err+et mut*e, string::String+st *buf) -> io::Result
+    where err::checked(*e)
+{
+    send_fn impl = self->impl_send;
+    if impl == 0 {
+        err::fail(e, 2, "no send impl");
+        return io::Result::Error;
+    }
+    static_attest(safe(impl));
+
+    usize mut memlen = buf->len;
+    io::Result rr = (io::Result)impl(self, e, et, as<u8*>(buf->mem), &memlen);
+    if err::check(e) {
+        return rr;
+    }
+    return rr;
+}
+
+export fn close(Socket mut*self) {
+    if self->impl_close == 0 {
+        return;
+    }
+    static_attest(safe(self->impl_close));
+    self->impl_close(&self->ctx);
+}

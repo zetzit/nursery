@@ -4,54 +4,64 @@ using <assert.h>::{assert};
 using string;
 using address;
 using err;
-using udp;
+using tcp_server;
+using tcp;
 using io;
 using io::unix;
 using net;
+using pool;
 
 export fn main() -> int {
-    new+1000 e = err::make();
-
-    new recv_addr = address::from_cstr("0.0.0.0:8083");
-    new send_addr = address::from_cstr("0.0.0.0:0");
-
+    new+1000 p   = pool::make(sizeof(tcp::Socket));
+    new+1000 e   = err::make();
     new+10 async = unix::make();
-
-
-    new receiver = net::make_udp(net::os(), &e, &recv_addr, &async);
-    e.abort();
-
-    new sender   = net::make_udp(net::os(), &e, &send_addr, &async);
-    e.abort();
-
-
-    new+100 msg = string::make();
-    msg.append_cstr("helloouuu");
-
-    sender.sendto(&e, &msg, &recv_addr);
-    e.abort();
-
-    io::select(&async, &e, &receiver, io::Ready::Read);
+    new srv_addr = address::from_cstr("0.0.0.0:8083");
+    new server   = net::tcp_server(net::os(), &e, &srv_addr, &async);
     e.abort();
 
     for (;;) {
-        io::wait(&async, &e);
-        e.abort();
+        let client = (tcp::Socket mut *)p.alloc();
+        err::assert_safe(client);
 
-        string::String+100 mut sbuf = {0};
-        sbuf.clear();
-
-        new ra = address::none();
-        if receiver.recvfrom(&e, &sbuf, &ra) == io::Result::Ready {
-            printf("%zu >%.*s<\n", sbuf.len, (int)sbuf.len, sbuf.mem);
-            break;
+        if server.accept(&e, client) == io::Result::Ready {
+            e.abort();
+            new+100 saddr = string::make();
+            client->remote_addr.to_string(&saddr);
+            printf("accepted new client %x from %s\n", client, saddr.cstr());
+        } else {
+            p.free(client);
         }
         e.abort();
 
+        p.each(process_client, &p);
+
+        io::wait(&async, &e);
+        e.abort();
     }
 
-    receiver.close();
-    sender.close();
-
+    server.close();
     return 0;
+}
+
+fn process_client(pool::Pool mut *p, void mut *item, void mut *user)
+    where pool::member(item, p)
+{
+    let client  = (tcp::Socket mut *)item;
+    new+1000 e  = err::make();
+    new+100 sbuf = string::make();
+
+    if client->recv(&e, &sbuf) == io::Result::Ready {
+        e.abort();
+        printf("%s\n", sbuf.cstr());
+
+        new+1000 msg = string::make();
+        msg.append_cstr("HTTP/1.1 200 OK\n");
+        msg.append_cstr("Connection: close\n");
+        msg.append_cstr("\n");
+        msg.append_cstr("ok cool\n");
+        client->send(&e, &msg);
+        client->close();
+        p->free(item);
+    }
+    e.abort();
 }
