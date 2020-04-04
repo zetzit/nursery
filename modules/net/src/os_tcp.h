@@ -30,7 +30,11 @@ static inline io_Result os_net_tcp_send(
         self->ctx.fd,
         mem,
         *memlen,
+#if defined(__linux__)
         MSG_NOSIGNAL
+#else
+        0
+#endif
     );
 
     if (r < 0) {
