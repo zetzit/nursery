@@ -254,6 +254,7 @@ fn impl_never(io::Context mut*ctx, err::Err+et mut*e, u8 mut* to, usize mut *l) 
 fn impl_timeout_read(io::Context mut*ctx, err::Err+et mut*e, u8 mut* to, usize mut *l) -> io::Result
     where err::checked(*e)
 {
+
     *l = 0;
 
     if ctx->time == 0 {
@@ -262,7 +263,7 @@ fn impl_timeout_read(io::Context mut*ctx, err::Err+et mut*e, u8 mut* to, usize m
 
     time::Time now  = time::tick();
     u64 mut now_m = now.to_millis();
-    if now_m > ctx->time {
+    if now_m >= ctx->time {
         return io::Result::Ready;
     } else {
         Async mut* self = (Async mut*)ctx->async;
@@ -271,7 +272,6 @@ fn impl_timeout_read(io::Context mut*ctx, err::Err+et mut*e, u8 mut* to, usize m
         if self->timeout < 0 || (u64)self->timeout > remains {
             self->timeout = (int)remains;
         }
-
     }
     return io::Result::Later;
 }

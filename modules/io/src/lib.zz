@@ -39,12 +39,13 @@ export fntype close_fn (Context mut* ctx);
 
 
 export struct Context {
+    bool        isvalid;
+    Async mut* unsafe async;
+
+    // internal to the io implementation
+    u64         time;
     int         fd;
     void mut*   handle;
-    u64         time;
-    bool        isvalid;
-
-    Async mut* unsafe async;
 }
 
 export struct Io {

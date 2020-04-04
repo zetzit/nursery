@@ -1,0 +1,359 @@
+using io;
+using err;
+using time;
+using string;
+using <string.h>::{memset};
+using <windows.h> as windows;
+using <stdio.h>::{fprintf, stderr, getchar, EOF};
+using <conio.h>::{_getch};
+
+export struct Async+ {
+    io::Async       base;
+    u32             timeout;
+    usize           count;
+    usize           tail;
+
+    windows::HANDLE completion_port;
+}
+
+export fn make(Async+tail mut new *self) {
+    memset(self, 0, (usize)sizeof(Async));
+
+    self->base.upper  = self;
+    self->tail        = tail;
+
+    self->base.impl_make_timeout    = impl_make_timeout;
+    //self->base.impl_make_channel    = impl_make_channel;
+    self->base.impl_select          = impl_select;
+    //self->base.impl_wake            = impl_wake;
+    self->base.impl_wait            = impl_wait;
+
+
+      // Create a new completion port.  
+    self->completion_port = (windows::HANDLE)windows::CreateIoCompletionPort(windows::INVALID_HANDLE_VALUE, 0,0,0);
+    self->reset();
+}
+
+fn reset(Async mut *self)
+{
+    self->count     = 0;
+    self->timeout   = (u32)windows::INFINITE;
+}
+
+fn impl_select(io::Async mut* async, err::Err+et mut*e, io::Context mut*ctx, io::Ready w)
+    where err::checked(*e)
+{
+    let self = (Async mut *)async->upper;
+    static_attest(safe(self));
+
+    if ctx->async == 0 {
+        err::fail(e,1, "not an async io");
+        return;
+    }
+
+    if ctx->fd != 0 {
+        //TODO
+    }
+
+    if ctx->time != 0 {
+        time::Time now  = time::tick();
+        u64 mut now_m = now.to_millis();
+        u64 remains = ctx->time - now_m;
+        if self->timeout < 0 || (u64)self->timeout > remains {
+            self->timeout = (u32)remains;
+        }
+    }
+}
+
+
+fn impl_make_timeout(io::Async mut *async, err::Err+et mut*e, time::Time t2) -> io::Io
+    where err::checked(*e)
+{
+    if !t2.finite {
+        return io::Io {
+            read_impl:  impl_never,
+        };
+    }
+
+    time::Time now = time::tick();
+    u64 mut expires = now.to_millis();
+    expires += t2.to_millis();
+
+    io::Context ctx = io::Context{
+        time:       expires,
+        async:      (io::Async mut*)async,
+        isvalid:    true,
+    };
+
+    return io::Io {
+        read_impl:  impl_timeout_read,
+        close_impl: impl_timer_close,
+        ctx:        ctx,
+    };
+}
+
+fn impl_never(io::Context mut*ctx, err::Err+et mut*e, u8 mut* to, usize mut *l) -> io::Result
+{
+    return io::Result::Later;
+}
+
+fn impl_timeout_read(io::Context mut*ctx, err::Err+et mut*e, u8 mut* to, usize mut *l) -> io::Result
+    where err::checked(*e)
+{
+    *l = 0;
+
+    if ctx->time == 0 {
+        return io::Result::Eof;
+    }
+
+    time::Time now  = time::tick();
+    u64 mut now_m = now.to_millis();
+    if now_m >= ctx->time {
+        return io::Result::Ready;
+    } else {
+        Async mut* self = (Async mut*)ctx->async;
+        static_attest(safe(self));
+        u64 remains = ctx->time - now_m;
+        if self->timeout < 0 || (u64)self->timeout > remains {
+            self->timeout = (u32)remains;
+        }
+    }
+    return io::Result::Later;
+}
+
+fn impl_timer_close(io::Context mut*ctx) {
+    ctx->time     = 0;
+    ctx->isvalid  = false;
+}
+
+fn impl_wait(io::Async mut* async, err::Err+et mut*e)
+    where err::checked(*e)
+{
+    let self = (Async mut *)async->upper;
+    static_attest(safe(self));
+
+    windows::DWORD mut lpNumberOfBytesTransferred;
+    int mut lpCompletionKey;
+    windows::OVERLAPPED mut * mut lpOverlapped;
+
+    //fprintf(stderr, "> %d %d\n", self->timeout, self->completion_port);
+    int rr = (int)windows::GetQueuedCompletionStatus(
+       self->completion_port,
+       &lpNumberOfBytesTransferred,
+       (windows::PULONG_PTR)&lpCompletionKey,
+       &lpOverlapped,
+       self->timeout
+    );
+    //fprintf(stderr, "<\n");
+
+    self->reset();
+
+    if rr < 0 {
+        err::fail_with_errno(e, "poll");
+        return;
+    }
+}
+
+// stdin
+
+struct StdinImpl {
+    bool    hasdata;
+    int     data;
+    windows::SYNCHRONIZATION_BARRIER barrier;
+    windows::HANDLE thread;
+    windows::HANDLE eventloop_port;
+}
+
+export fn stdin(io::Io mut new*self, Async mut * async) {
+
+    time::Time now = time::tick();
+    char mut buf[200] = {0};
+    snprintf (buf, static(len(buf)),
+        "\\\\.\\pipe\\ugly-iocp-stdin-%d-%lu", 
+        windows::GetCurrentProcessId(),
+        now.to_millis()
+    );
+
+    StdinImpl mut * impl = windows::calloc(1, sizeof(StdinImpl));
+    err::assert_safe(impl);
+    impl->eventloop_port = async->completion_port;
+    impl->data = -1;
+
+    bool x = (bool)windows::InitializeSynchronizationBarrier(
+        &impl->barrier,
+        2,
+        -1
+    );
+
+    if !x {
+        new+1000 e = err::make();
+        fail_with_win32(&e, "InitializeSynchronizationBarrier");
+        e.abort();
+    }
+
+    self->ctx.isvalid   = true;
+    self->ctx.handle    = impl;
+    self->ctx.async     = (io::Async mut*)async;
+    self->read_impl     = impl_stdio_read;
+    self->close_impl    = impl_stdio_close;
+
+    impl->thread = (windows::HANDLE)windows::CreateThread(
+        0, 0,
+        (windows::LPTHREAD_START_ROUTINE)stdin_thread,
+        impl,
+        0, 0
+    );
+}
+
+fn impl_stdio_close(io::Context mut*ctx)
+{
+    let impl = (StdinImpl mut*)ctx->handle;
+    static_attest(safe(impl));
+
+    windows::TerminateThread(impl->thread, 0);
+    windows::free(impl);
+    ctx->handle     = 0;
+    ctx->isvalid    = 0;
+}
+
+fn impl_stdio_read(io::Context mut*ctx, err::Err+et mut*e, u8 mut* to, usize mut *l) -> io::Result
+    where err::checked(*e)
+    where *l == len(to)
+{
+    let impl = (StdinImpl mut*)ctx->handle;
+    static_attest(safe(impl));
+
+    if *l == 0 {
+        err::fail(e, 2, "buffer is 0 long");
+        return io::Result::Error;
+    }
+
+    if impl->hasdata {
+        int data = impl->data;
+        impl->hasdata = false;
+
+        to[0] = (u8)data;
+        *l = 1;
+
+        windows::SetLastError(0);
+        bool x = (bool)windows::EnterSynchronizationBarrier(
+            &impl->barrier,
+            0
+        );
+        if (int)windows::GetLastError() != 0 {
+            new+1000 e = err::make();
+            fail_with_win32(&e, "EnterSynchronizationBarrier");
+            e.eprint();
+        }
+        if data == (int)EOF {
+            return io::Result::Eof;
+        }
+        return io::Result::Ready;
+    }
+    return io::Result::Later;
+}
+
+fn stdin_thread (StdinImpl mut*self)
+{
+
+    for (;;) {
+        self->data = (int)getchar();
+        self->hasdata = true;
+
+        let mut x = (bool)windows::PostQueuedCompletionStatus(
+                self->eventloop_port,
+                0,
+                0x12, //TODO
+                0);
+        if  !x {
+            new+1000 e = err::make();
+            fail_with_win32(&e, "PostQueuedCompletionStatus");
+            e.abort();
+        }
+
+        windows::SetLastError(0);
+
+        x = (bool)windows::EnterSynchronizationBarrier(
+            &self->barrier,
+            0
+        );
+
+        if (int)windows::GetLastError() != 0 {
+            new+1000 e = err::make();
+            fail_with_win32(&e, "EnterSynchronizationBarrier");
+            e.eprint();
+        }
+
+
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// err
+
+using <stdio.h>::{printf, snprintf, vsnprintf, vfprintf};
+using <stdarg.h>::{va_list, va_start, va_end};
+using <string.h>::{strncat, strlen};
+
+export fn fail_with_win32(
+        err::Err+tail mut* self,
+        char* callsite_source<file>      unsafe file,
+        char* callsite_source<function>  unsafe scope,
+        usize callsite_source<line>      line,
+        char*  fmt,
+        ...
+)
+    where err::checked(*self)
+    model err::checked(*self)
+{
+    let errnum = (windows::DWORD)windows::GetLastError();
+
+    self->error = (u8)errnum;
+
+    va_list mut vargs;
+    va_start(vargs, fmt);
+    vsnprintf(self->description, sizeof(self->description), fmt, vargs);
+    va_end(vargs);
+
+    strncat(self->description, " : ", as<usize>(sizeof(self->description)) - as<usize>(strlen(self->description)));
+
+
+    char mut * mut buf= 0;
+    unsafe {
+        buf = self->description + as<usize>(strlen(self->description));
+    }
+
+    usize l = (usize) windows::FormatMessageA(
+        (int)windows::FORMAT_MESSAGE_FROM_SYSTEM |
+        (int)windows::FORMAT_MESSAGE_IGNORE_INSERTS,
+        0,
+        errnum,
+        windows::MAKELANGID(windows::LANG_NEUTRAL, windows::SUBLANG_DEFAULT), 
+        buf,
+        as<usize>(sizeof(self->description)) - as<usize>(strlen(self->description)),
+        0
+    );
+
+    string::clear(&(self->locations));
+    err::backtrace(self, file, scope, line);
+    static_attest(err::checked(*self));
+}
