@@ -109,9 +109,9 @@ static io_Result os_net_tcp_server_accept(
 
 
     if (((struct sockaddr*)client->remote_addr.os)->sa_family  == AF_INET) {
-        client->remote_addr.type = net_address_Type_Ipv4;
+        client->remote_addr.typ = net_address_Type_Ipv4;
     } else if (((struct sockaddr*)client->remote_addr.os)->sa_family  == AF_INET6) {
-        client->remote_addr.type = net_address_Type_Ipv6;
+        client->remote_addr.typ = net_address_Type_Ipv6;
     }
 
     client->ctx.isvalid = true;
@@ -129,7 +129,7 @@ static inline void os_net_tcp_server_listen(err_Err *e, size_t et, net_address_A
 {
 
     size_t sockaddrsize = 0;
-    switch (addr->type) {
+    switch (addr->typ) {
         case net_address_Type_Ipv6:
             sock->ctx.fd = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
             sockaddrsize = sizeof(struct sockaddr_in6);

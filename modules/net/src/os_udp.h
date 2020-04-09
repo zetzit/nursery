@@ -39,9 +39,9 @@ static io_Result os_net_udp_recvfrom(
     );
 
     if (((struct sockaddr*)addr->os)->sa_family  == AF_INET) {
-        addr->type = net_address_Type_Ipv4;
+        addr->typ = net_address_Type_Ipv4;
     } else if (((struct sockaddr*)addr->os)->sa_family  == AF_INET6) {
-        addr->type = net_address_Type_Ipv6;
+        addr->typ = net_address_Type_Ipv6;
     }
 
     if (r < 0) {
@@ -67,7 +67,7 @@ static inline io_Result os_net_udp_sendto(
 )
 {
     unsigned alen = 0;
-    switch (addr->type) {
+    switch (addr->typ) {
         case net_address_Type_Ipv4:
             alen = sizeof(struct sockaddr_in);
             break;
@@ -112,7 +112,7 @@ static inline void os_net_udp_bind(err_Err *e, size_t et, net_address_Address co
 {
 
     size_t sockaddrsize = 0;
-    switch (addr->type) {
+    switch (addr->typ) {
         case net_address_Type_Ipv6:
             sock->ctx.fd = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
             sockaddrsize = sizeof(struct sockaddr_in6);

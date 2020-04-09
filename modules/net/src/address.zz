@@ -14,12 +14,12 @@ export enum Type {
 }
 
 export struct Address {
-    Type    type;
+    Type    typ;
     u8      os[24];
 }
 
 export fn none(Address mut new* self) {
-    self->type = Type::Invalid;
+    self->typ = Type::Invalid;
 }
 
 
@@ -28,7 +28,7 @@ export fn eq(Address * self, Address * other) -> bool {
 }
 
 export fn valid(Address * self) -> bool {
-    return self->type != Type::Invalid;
+    return self->typ != Type::Invalid;
 }
 
 export fn from_string(Address mut new * self, string::String+st *s)
@@ -154,7 +154,7 @@ export fn from_str_ipv6(Address mut new* self, char * s, usize slen) -> bool
     self->set_ip(Type::Ipv6, ip);
     self->set_port(port);
 
-    self->type = Type::Ipv6;
+    self->typ = Type::Ipv6;
     return true;
 }
 
@@ -205,7 +205,7 @@ export fn from_str_ipv4(Address mut new* self, char *s, usize slen) -> bool
     self->set_ip(Type::Ipv4, ip);
     self->set_port(port);
 
-    self->type = Type::Ipv4;
+    self->typ = Type::Ipv4;
     return true;
 }
 
@@ -213,7 +213,7 @@ export fn from_str_ipv4(Address mut new* self, char *s, usize slen) -> bool
 export fn ip_to_string(Address * self, string::String+st mut*to)
     where st>2
 {
-    switch self->type {
+    switch self->typ {
         Type::Invalid => {
         }
         Type::Ipv4 => {
@@ -287,7 +287,7 @@ export fn to_string(Address * self, string::String+st mut*to)
     where st>2
 {
 
-    switch self->type {
+    switch self->typ {
         Type::Invalid => {}
         Type::Ipv4 => {
             u16 port = byteorder::from_be16((u16)os::os_net_address_ipv4_get_port(self->os));
@@ -313,7 +313,7 @@ export fn to_string(Address * self, string::String+st mut*to)
 
 
 export fn set_port(Address mut*self, u16 port) {
-    switch self->type {
+    switch self->typ {
         Type::Ipv4 => {
             os::os_net_address_ipv4_set_port(self->os, byteorder::to_be16(port));
         }
@@ -326,7 +326,7 @@ export fn set_port(Address mut*self, u16 port) {
 }
 
 export fn get_port(Address *self) -> u16 {
-    switch self->type {
+    switch self->typ {
         Type::Ipv4 => {
             return (u16)byteorder::from_be16(os::os_net_address_ipv4_get_port(self->os));
         }
@@ -345,7 +345,7 @@ export fn get_port(Address *self) -> u16 {
 
 export fn get_ip(Address *self) -> u8*
 {
-    switch self->type {
+    switch self->typ {
         Type::Ipv6 => {
             return (u8*)os::os_net_address_ipv4_get_ip(self->os);
         }
@@ -362,8 +362,8 @@ export fn get_ip(Address *self) -> u8*
 export fn set_ip(Address mut *self, Type t, u8*b)
     where (t == Type::Ipv4 && len(b) >= 4) || (t == Type::Ipv6 && len(b) >= 16)
 {
-    self->type = t;
-    switch self->type {
+    self->typ = t;
+    switch self->typ {
         Type::Ipv4=> {
             os::os_net_address_ipv4_set_ip(self->os, b);
         }
