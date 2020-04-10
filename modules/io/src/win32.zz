@@ -7,20 +7,18 @@ using <windows.h> as windows;
 using <stdio.h>::{fprintf, stderr, getchar, EOF};
 using <conio.h>::{_getch};
 
-export struct Async+ {
+export struct Async {
     io::Async       base;
     u32             timeout;
     usize           count;
-    usize           tail;
 
     windows::HANDLE completion_port;
 }
 
-export fn make(Async+tail mut new *self) {
+export fn make(Async mut new *self) {
     memset(self, 0, (usize)sizeof(Async));
 
     self->base.upper  = self;
-    self->tail        = tail;
 
     self->base.impl_make_timeout    = impl_make_timeout;
     //self->base.impl_make_channel    = impl_make_channel;
