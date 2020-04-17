@@ -15,6 +15,7 @@ export struct Async {
     windows::HANDLE completion_port;
 }
 
+
 export fn make(Async mut new *self) {
     memset(self, 0, (usize)sizeof(Async));
 
@@ -45,7 +46,7 @@ fn impl_select(io::Async mut* async, err::Err+et mut*e, io::Context mut*ctx, io:
     static_attest(safe(self));
 
     if ctx->async == 0 {
-        err::fail(e,1, "not an async io");
+        err::fail(e, err::InvalidArgument, "not an async io");
         return;
     }
 
@@ -222,7 +223,7 @@ fn impl_stdio_read(io::Context mut*ctx, err::Err+et mut*e, u8 mut* to, usize mut
     static_attest(safe(impl));
 
     if *l == 0 {
-        err::fail(e, 2, "buffer is 0 long");
+        err::fail(e, err::InvalidArgument, "buffer is 0 long");
         return io::Result::Error;
     }
 
@@ -241,7 +242,7 @@ fn impl_stdio_read(io::Context mut*ctx, err::Err+et mut*e, u8 mut* to, usize mut
         if (int)windows::GetLastError() != 0 {
             new+1000 e = err::make();
             fail_with_win32(&e, "EnterSynchronizationBarrier");
-            e.eprint();
+            e.eprintf(stderr);
         }
         if data == (int)EOF {
             return io::Result::Eof;
@@ -279,7 +280,7 @@ fn stdin_thread (StdinImpl mut*self)
         if (int)windows::GetLastError() != 0 {
             new+1000 e = err::make();
             fail_with_win32(&e, "EnterSynchronizationBarrier");
-            e.eprint();
+            e.eprintf(stderr);
         }
 
 
@@ -307,6 +308,7 @@ fn stdin_thread (StdinImpl mut*self)
 
 
 // err
+// TODO this should be part of err
 
 using <stdio.h>::{printf, snprintf, vsnprintf, vfprintf};
 using <stdarg.h>::{va_list, va_start, va_end};
@@ -323,35 +325,34 @@ export fn fail_with_win32(
     where err::checked(*self)
     model err::checked(*self)
 {
-    let errnum = (windows::DWORD)windows::GetLastError();
+    static_attest((self->trace).len < tail);
 
-    self->error = (u8)errnum;
-
-    va_list mut vargs;
-    va_start(vargs, fmt);
-    vsnprintf(self->description, sizeof(self->description), fmt, vargs);
-    va_end(vargs);
-
-    strncat(self->description, " : ", as<usize>(sizeof(self->description)) - as<usize>(strlen(self->description)));
-
+    self->system = (int)windows::GetLastError();
+    self->error  = err::SystemError;
 
     char mut * mut buf= 0;
     unsafe {
-        buf = self->description + as<usize>(strlen(self->description));
+        buf = self->trace.mem + as<usize>(strlen(self->trace.mem));
     }
 
     usize l = (usize) windows::FormatMessageA(
         (int)windows::FORMAT_MESSAGE_FROM_SYSTEM |
         (int)windows::FORMAT_MESSAGE_IGNORE_INSERTS,
         0,
-        errnum,
+        self->system,
         windows::MAKELANGID(windows::LANG_NEUTRAL, windows::SUBLANG_DEFAULT), 
         buf,
-        as<usize>(sizeof(self->description)) - as<usize>(strlen(self->description)),
+        tail - as<usize>(strlen(self->trace.mem)),
         0
     );
 
-    string::clear(&(self->locations));
+    self->trace.format(" : ");
+
+    va_list mut vargs;
+    va_start(vargs, fmt);
+    self->trace.vformat(fmt, vargs);
+    va_end(vargs);
+
     err::backtrace(self, file, scope, line);
     static_attest(err::checked(*self));
 }

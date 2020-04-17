@@ -55,7 +55,7 @@ export fn recv(Socket mut *self, err::Err+et mut*e, string::String+st mut *buf) 
 {
     recv_fn impl = self->impl_recv;
     if impl == 0 {
-        err::fail(e, 2, "no recv impl");
+        err::fail(e, err::NotImplemented, "no recv impl");
         return io::Result::Error;
     }
     static_attest(safe(impl));
@@ -75,7 +75,7 @@ export fn send(Socket mut *self, err::Err+et mut*e, string::String+st *buf) -> i
 {
     send_fn impl = self->impl_send;
     if impl == 0 {
-        err::fail(e, 2, "no send impl");
+        err::fail(e, err::NotImplemented, "no send impl");
         return io::Result::Error;
     }
     static_attest(safe(impl));

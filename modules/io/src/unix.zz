@@ -73,13 +73,13 @@ fn impl_unix_select(io::Async mut* async, err::Err+et mut*e, io::Context mut*ctx
     static_attest(safe(self));
 
     if ctx->async == 0 {
-        err::fail(e,1, "not an async io");
+        err::fail(e, err::InvalidArgument, "not an async io");
         return;
     }
 
     if ctx->fd != 0 {
         if !select_fd(self, ctx->fd, (int)POLLIN) {
-            err::fail(e,1, "too many fds");
+            err::fail(e,err::OutOfTail,"too many fds");
             return;
         }
     }
@@ -155,13 +155,13 @@ fn impl_unix_read(io::Context mut*ctx, err::Err+et mut*e, u8 mut* to, usize mut 
     if ctx->async != 0 {
         static_attest(safe(ctx->async));
         if !select_fd((Async mut*)ctx->async, ctx->fd, (int)POLLIN) {
-            err::fail(e,1, "too many fds");
+            err::fail(e, err::OutOfTail, "too many fds");
             return io::Result::Error;
         }
     }
 
     if *l == 0 {
-        err::fail(e, 2, "buffer is 0 long");
+        err::fail(e, err::InvalidArgument, "buffer is 0 long");
         return io::Result::Error;
     }
 

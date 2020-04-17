@@ -80,7 +80,7 @@ export fn recvfrom(Socket mut *self, err::Err+et mut*e, string::String+st mut *b
 {
     recvfrom_fn recv = (recvfrom_fn)self->impl_recvfrom;
     if recv == 0 {
-        err::fail(e, 2, "no recv impl");
+        err::fail(e, err::NotImplemented, "no recv impl");
         return io::Result::Error;
     }
     static_attest(safe(recv));
@@ -100,7 +100,7 @@ export fn sendto(Socket mut *self, err::Err+et mut*e, string::String+st *buf, ad
 {
     sendto_fn send = (sendto_fn)self->impl_sendto;
     if send == 0 {
-        err::fail(e, 2, "no send impl");
+        err::fail(e, err::NotImplemented, "no send impl");
         return io::Result::Error;
     }
     static_attest(safe(send));

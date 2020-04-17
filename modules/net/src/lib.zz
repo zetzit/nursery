@@ -50,7 +50,7 @@ export fn udp(
 {
     new_udp_fn impl_new_udp = (new_udp_fn)engine->impl_new_udp;
     if impl_new_udp == 0 {
-        err::fail(e, 1, "no new_udp impl");
+        err::fail(e, err::NotImplemented, "no new_udp impl");
         return;
     }
     static_attest(safe(impl_new_udp));
@@ -66,7 +66,7 @@ export fn tcp_server(
 {
     new_tcp_server_fn impl_new_tcp_server = (new_tcp_server_fn)engine->impl_new_tcp_server;
     if impl_new_tcp_server == 0 {
-        err::fail(e, 1, "no new_tcp_server impl");
+        err::fail(e, err::NotImplemented, "no new_tcp_server impl");
         return;
     }
     static_attest(safe(impl_new_tcp_server));
