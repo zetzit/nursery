@@ -1,4 +1,4 @@
-#if defined(__unix__) || defined(__APPLE__)
+#if defined(__unix__) || defined(__APPLE__) || defined(ESP_PLATFORM)
 #include <netinet/in.h>
 #include <stdint.h>
 #include <string.h>
@@ -117,9 +117,9 @@ static io_Result os_net_tcp_server_accept(
     client->ctx.isvalid = true;
     client->ctx.fd      = r;
     client->ctx.async   = self->ctx.async;
-    client->impl_send   = os_net_tcp_send;
-    client->impl_recv   = os_net_tcp_recv;
-    client->impl_close  = os_net_tcp_close;
+    client->impl_send.fn   = (void*)os_net_tcp_send;
+    client->impl_recv.fn   = (void*)os_net_tcp_recv;
+    client->impl_close.fn  = (void*)os_net_tcp_close;
 
     return io_Result_Ready;
 }
@@ -161,8 +161,8 @@ static inline void os_net_tcp_server_listen(err_Err *e, size_t et, net_address_A
         err_fail_with_errno(e, et, __FILE__, "os_net_tcp_server_open", __LINE__, "listen");
     }
 
-    sock->impl_accept   = os_net_tcp_server_accept;
-    sock->impl_close    = os_net_tcp_close;
+    sock->impl_accept.fn   = (void*)os_net_tcp_server_accept;
+    sock->impl_close.fn    = (void*)os_net_tcp_close;
 
     sock->ctx.isvalid = true;
 }

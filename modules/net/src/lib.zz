@@ -6,14 +6,14 @@ using tcp           as tcpI;
 using err;
 using io;
 
-fntype new_udp_fn(
+closure new_udp_fn(
     Engine *self,
     err::Err+et mut*e,
     address::Address *local_addr,
     io::Async mut* unsafe async
 )  -> udpI::Socket;
 
-fntype new_tcp_server_fn(
+closure new_tcp_server_fn(
     Engine *self,
     err::Err+et mut*e,
     address::Address *local_addr,
@@ -49,7 +49,7 @@ export fn udp(
     where err::checked(*e)
 {
     new_udp_fn impl_new_udp = (new_udp_fn)engine->impl_new_udp;
-    if impl_new_udp == 0 {
+    if impl_new_udp.fn == 0 {
         err::fail(e, err::NotImplemented, "no new_udp impl");
         return;
     }
@@ -65,7 +65,7 @@ export fn tcp_server(
     where err::checked(*e)
 {
     new_tcp_server_fn impl_new_tcp_server = (new_tcp_server_fn)engine->impl_new_tcp_server;
-    if impl_new_tcp_server == 0 {
+    if impl_new_tcp_server.fn == 0 {
         err::fail(e, err::NotImplemented, "no new_tcp_server impl");
         return;
     }

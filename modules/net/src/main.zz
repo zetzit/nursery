@@ -7,14 +7,13 @@ using err;
 using tcp_server;
 using tcp;
 using io;
-using io::unix;
 using net;
 using pool;
 
 export fn main() -> int {
     new+1000 p   = pool::make(sizeof(tcp::Socket));
     new+1000 e   = err::make();
-    new+10 async = unix::make();
+    new async = io::select::make();
     new srv_addr = address::from_cstr("0.0.0.0:8083");
     new server   = net::tcp_server(net::os(), &e, &srv_addr, &async);
     e.abort();

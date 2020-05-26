@@ -23,7 +23,7 @@ inline using (needs
     os_net_udp_sendto,
 };
 
-export fntype sendto_fn(
+export closure sendto_fn(
         Socket mut*sock,
         err::Err *e,
         usize et,
@@ -32,7 +32,7 @@ export fntype sendto_fn(
         address::Address *addr,
 ) -> io::Result;
 
-export fntype recvfrom_fn   (
+export closure recvfrom_fn   (
         Socket mut*sock,
         err::Err mut *e,
         usize et,
@@ -49,7 +49,7 @@ export struct Socket {
 }
 
 export fn close(Socket mut*self) {
-    if self->impl_close == 0 {
+    if self->impl_close.fn == 0 {
         return;
     }
     static_attest(safe(self->impl_close));
@@ -78,8 +78,8 @@ pub fn os_new(Engine * _engine, err::Err+et mut*e, address::Address *addr,  io::
 export fn recvfrom(Socket mut *self, err::Err+et mut*e, string::String+st mut *buf, address::Address mut*from) -> io::Result
     where err::checked(*e)
 {
-    recvfrom_fn recv = (recvfrom_fn)self->impl_recvfrom;
-    if recv == 0 {
+    recvfrom_fn recv = recvfrom_fn{fn: self->impl_recvfrom};
+    if recv.fn == 0 {
         err::fail(e, err::NotImplemented, "no recv impl");
         return io::Result::Error;
     }
@@ -98,8 +98,8 @@ export fn recvfrom(Socket mut *self, err::Err+et mut*e, string::String+st mut *b
 export fn sendto(Socket mut *self, err::Err+et mut*e, string::String+st *buf, address::Address * to) -> io::Result
     where err::checked(*e)
 {
-    sendto_fn send = (sendto_fn)self->impl_sendto;
-    if send == 0 {
+    sendto_fn send = sendto_fn{fn: self->impl_sendto};
+    if send.fn == 0 {
         err::fail(e, err::NotImplemented, "no send impl");
         return io::Result::Error;
     }

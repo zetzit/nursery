@@ -1,9 +1,17 @@
 
 
-#if defined(__unix__) || defined(__APPLE__)
+#if defined(__unix__) || defined(__APPLE__) || defined(ESP_PLATFORM)
 #include <netinet/in.h>
 #include <stdint.h>
 #include <string.h>
+
+#if defined(ESP_PLATFORM)
+#include "lwip/err.h"
+#include "lwip/sockets.h"
+#include "lwip/sys.h"
+#include <lwip/netdb.h>
+#endif
+
 
 typedef union {
     char             raw[32];
@@ -53,4 +61,6 @@ static inline uint8_t const* os_net_address_ipv4_get_ip(uint8_t const *raw) {
     return (uint8_t const*)&(self->ipv4.sin_addr.s_addr);
 }
 
+#else
+#error "no os implementation for net::address"
 #endif

@@ -3,15 +3,16 @@ using string;
 using err;
 using slice;
 using <stdio.h>::{printf};
+using log;
 
 export symbol NotImplemented;
 export symbol Timeout;
 
-export fntype make_timeout_fn   (Async mut* async, err::Err+et mut*e, time::Time t2) -> Io;
-export fntype make_channel_fn   (Async mut* async, err::Err+et mut*e, Io mut *read, Io mut *write);
-export fntype select_fn         (Async mut* async, err::Err+et mut* e, Context mut*ctx, Ready w);
-export fntype wake_fn           (Async mut* async);
-export fntype wait_fn           (Async mut* async, err::Err+et mut* e);
+export closure make_timeout_fn   (Async mut* async, err::Err+et mut*e, time::Time t2) -> Io;
+export closure make_channel_fn   (Async mut* async, err::Err+et mut*e, Io mut *read, Io mut *write);
+export closure select_fn         (Async mut* async, err::Err+et mut* e, Context mut*ctx, Ready w);
+export closure wake_fn           (Async mut* async);
+export closure wait_fn           (Async mut* async, err::Err+et mut* e);
 
 export struct Async {
     void * upper;
@@ -36,9 +37,9 @@ export enum Result {
     Eof,
 }
 
-export fntype read_fn  (Context mut* ctx, err::Err+et mut* e, u8 mut* to, usize mut* len) -> Result;
-export fntype write_fn (Context mut* ctx, err::Err+et mut* e, u8* to, usize mut* len) -> Result;
-export fntype close_fn (Context mut* ctx);
+export closure read_fn  (Context mut* ctx, err::Err+et mut* e, u8 mut* to, usize mut* len) -> Result;
+export closure write_fn (Context mut* ctx, err::Err+et mut* e, u8* to, usize mut* len) -> Result;
+export closure close_fn (Context mut* ctx);
 
 
 export struct Context {
@@ -68,7 +69,7 @@ export fn read(Io mut* self, err::Err+et mut* e, string::String+st mut* str) -> 
 {
     static_attest(str->len < len(str->mem));
 
-    if self->read_impl == 0 {
+    if self->read_impl.fn == 0 {
         err::fail(e, NotImplemented, "noimpl");
         return Result::Error;
     }
@@ -91,7 +92,7 @@ export fn read(Io mut* self, err::Err+et mut* e, string::String+st mut* str) -> 
 export fn read_slice(Io mut* self, err::Err+et mut* e, slice::MutSlice mut* slice) -> Result
     where err::checked(*e)
 {
-    if self->read_impl == 0 {
+    if self->read_impl.fn == 0 {
         err::fail(e, NotImplemented, "noimpl");
         return Result::Error;
     }
@@ -121,7 +122,7 @@ export fn read_slice(Io mut* self, err::Err+et mut* e, slice::MutSlice mut* slic
 export fn read_bytes(Io mut* self, err::Err+et mut* e, u8 mut* mem, usize mut *memlen) -> Result
     where err::checked(*e)
 {
-    if self->read_impl == 0 {
+    if self->read_impl.fn == 0 {
         err::fail(e, NotImplemented, "noimpl");
         return Result::Error;
     }
@@ -142,7 +143,7 @@ export fn readline(Io mut* self, err::Err+et mut* e, string::String+st mut* str)
     where err::checked(*e)
     where st > 2
 {
-    if self->read_impl == 0 {
+    if self->read_impl.fn == 0 {
         err::fail(e, NotImplemented, "noimpl");
         return Result::Error;
     }
@@ -184,7 +185,7 @@ export fn write(Io mut* self, err::Err+et mut* e, string::String+st mut* str) ->
 export fn write_bytes(Io mut* self, err::Err+et mut* e, u8 *b, usize mut *blen) -> Result
     where err::checked(*e)
 {
-    if self->write_impl == 0 {
+    if self->write_impl.fn == 0 {
         err::fail(e, NotImplemented, "noimpl");
         return Result::Error;
     }
@@ -202,7 +203,7 @@ export fn write_cstr(Io mut* self, err::Err+et mut* e, char *b) -> Result
     where nullterm(b)
     where err::checked(*e)
 {
-    if self->write_impl == 0 {
+    if self->write_impl.fn == 0 {
         err::fail(e, NotImplemented, "noimpl");
         return Result::Error;
     }
@@ -220,7 +221,7 @@ export fn write_cstr(Io mut* self, err::Err+et mut* e, char *b) -> Result
 
 export fn close(Io mut* self)
 {
-    if self->close_impl == 0 {
+    if self->close_impl.fn == 0 {
         return;
     }
     static_attest(safe(self->close_impl));
@@ -230,7 +231,7 @@ export fn close(Io mut* self)
 export fn select(Async mut *self, err::Err+et mut* e, Context mut*ctx, Ready w)
     where err::checked(*e)
 {
-    if self->impl_select == 0 {
+    if self->impl_select.fn == 0 {
         return;
     }
     static_attest(safe(self->impl_select));
@@ -241,7 +242,7 @@ export fn select(Async mut *self, err::Err+et mut* e, Context mut*ctx, Ready w)
 export fn timeout(Async mut* self, err::Err+et mut*e, time::Time t2) -> Io
     where err::checked(*e)
 {
-    if self->impl_make_timeout != 0 {
+    if self->impl_make_timeout.fn != 0 {
         static_attest(safe(self->impl_make_timeout));
         return self->impl_make_timeout(self, e, t2);
     }
@@ -253,7 +254,7 @@ export fn timeout(Async mut* self, err::Err+et mut*e, time::Time t2) -> Io
 export fn channel(Async mut* self, err::Err+et mut*e, Io mut*read, Io mut*write)
     where err::checked(*e)
 {
-    if self->impl_make_channel != 0 {
+    if self->impl_make_channel.fn != 0 {
         static_attest(safe(self->impl_make_channel));
         self->impl_make_channel(self, e, read, write);
     }
@@ -261,7 +262,7 @@ export fn channel(Async mut* self, err::Err+et mut*e, Io mut*read, Io mut*write)
 
 
 export fn wake(Async mut* self) {
-    if self->impl_wake != 0 {
+    if self->impl_wake.fn != 0 {
         static_attest(safe(self->impl_wake));
         self->impl_wake(self);
     }
@@ -270,24 +271,26 @@ export fn wake(Async mut* self) {
 export fn wait(Async mut* self, err::Err+et mut*e)
      where err::checked(*e)
 {
-    if self->impl_wait != 0 {
+    if self->impl_wait.fn != 0 {
         static_attest(safe(self->impl_wait));
         self->impl_wait(self,e );
     }
 }
 
-export fntype poll_fn    (void mut *user, err::Err+et mut* e, Async mut* async) -> Result;
+export closure poll_fn    (void mut *user, err::Err+et mut* e, Async mut* async) -> Result;
 export fn await(Async mut* self, err::Err+et mut*e, void *poll, void mut* user, time::Time timeout_)
     where err::checked(*e)
     where safe(user)
     where safe(poll)
 {
+
     let mut tt = timeout(self, e,timeout_);
     string::String+8 mut b;
     b.clear();
     if err::check(e) {return;}
 
-    poll_fn fp = (poll_fn)poll;
+    poll_fn fp = poll_fn{fn: poll};
+
     for (;;) {
         if tt.valid() {
             if tt.read(e, &b) == Result::Ready {

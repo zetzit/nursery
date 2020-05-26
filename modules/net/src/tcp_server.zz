@@ -25,7 +25,7 @@ inline using (needs
     os_net_tcp_make_async,
 };
 
-export fntype accept_fn   (
+export closure accept_fn   (
         Server  mut *self,
         err::Err+et mut *e,
         tcp::Socket mut *client,
@@ -64,7 +64,7 @@ export fn accept(
     where err::checked(*e)
 {
     accept_fn impl = self->impl_accept;
-    if impl == 0 {
+    if impl.fn == 0 {
         err::fail(e, err::NotImplemented, "no recv impl");
         return io::Result::Error;
     }
@@ -79,7 +79,7 @@ export fn accept(
 }
 
 export fn close(Server mut*self) {
-    if self->impl_close == 0 {
+    if self->impl_close.fn == 0 {
         return;
     }
     static_attest(safe(self->impl_close));

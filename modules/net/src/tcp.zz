@@ -23,7 +23,7 @@ inline using (needs
     os_net_tcp_recv,
 };
 
-export fntype send_fn(
+export closure send_fn(
         Socket mut*sock,
         err::Err mut*e,
         usize et,
@@ -31,7 +31,7 @@ export fntype send_fn(
         usize mut*memlen,
 ) -> io::Result;
 
-export fntype recv_fn   (
+export closure recv_fn   (
         Socket mut*sock,
         err::Err mut *e,
         usize et,
@@ -54,7 +54,7 @@ export fn recv(Socket mut *self, err::Err+et mut*e, string::String+st mut *buf) 
     where err::checked(*e)
 {
     recv_fn impl = self->impl_recv;
-    if impl == 0 {
+    if impl.fn == 0 {
         err::fail(e, err::NotImplemented, "no recv impl");
         return io::Result::Error;
     }
@@ -74,7 +74,7 @@ export fn send(Socket mut *self, err::Err+et mut*e, string::String+st *buf) -> i
     where err::checked(*e)
 {
     send_fn impl = self->impl_send;
-    if impl == 0 {
+    if impl.fn == 0 {
         err::fail(e, err::NotImplemented, "no send impl");
         return io::Result::Error;
     }
@@ -89,7 +89,7 @@ export fn send(Socket mut *self, err::Err+et mut*e, string::String+st *buf) -> i
 }
 
 export fn close(Socket mut*self) {
-    if self->impl_close == 0 {
+    if self->impl_close.fn == 0 {
         return;
     }
     static_attest(safe(self->impl_close));

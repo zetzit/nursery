@@ -1,6 +1,6 @@
 
 
-#if defined(__unix__) || defined(__APPLE__)
+#if defined(__unix__) || defined(__APPLE__) || defined(ESP_PLATFORM)
 #include <netinet/in.h>
 #include <stdint.h>
 #include <string.h>
@@ -68,6 +68,10 @@ static inline io_Result os_net_udp_sendto(
 {
     unsigned alen = 0;
     switch (addr->typ) {
+        case net_address_Type_Invalid:
+            err_fail_with_errno(e, et, __FILE__, "os_net_udp_sendto", __LINE__, "invalid addr");
+            return io_Result_Error;
+            break;
         case net_address_Type_Ipv4:
             alen = sizeof(struct sockaddr_in);
             break;
@@ -137,7 +141,9 @@ static inline void os_net_udp_bind(err_Err *e, size_t et, net_address_Address co
 
     sock->impl_recvfrom = (void*)os_net_udp_recvfrom;
     sock->impl_sendto   = (void*)os_net_udp_sendto;
-    sock->impl_close    = os_net_udp_close;
+
+    sock->impl_close.fn = (void*)os_net_udp_close;
+    sock->impl_close.ctx = 0;
 
     sock->ctx.isvalid = true;
 }
