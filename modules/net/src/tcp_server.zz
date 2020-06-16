@@ -65,7 +65,7 @@ export fn accept(
 {
     accept_fn impl = self->impl_accept;
     if impl.fn == 0 {
-        err::fail(e, err::NotImplemented, "no recv impl");
+        err::fail(e, err::NotImplemented, "no accept impl");
         return io::Result::Error;
     }
     static_attest(safe(impl));
