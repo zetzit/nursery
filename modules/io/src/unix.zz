@@ -104,7 +104,7 @@ fn impl_wait(io::Async mut* async, err::Err+et mut*e)
     //printf("io::unix::wait %d\n", self->timeout);
     int rr = (int)poll(self->fds, self->count, self->timeout);
     self->reset();
-    if rr < 0 {
+    if rr < 0 && unsafe<bool>(errno != EINTR){
         err::fail_with_errno(e, "poll");
         return;
     }
